@@ -8,6 +8,7 @@ Helpers for the Arrow-backed Python stack: polars, pyarrow, duckdb. Small, theme
 pip install arrow-dx
 # optional extras
 pip install "arrow-dx[pandas]"
+pip install "arrow-dx[pyarrow]"
 pip install "arrow-dx[duckdb]"
 pip install "arrow-dx[all]"
 ```
@@ -37,13 +38,85 @@ unify_schema("data/", output_dir="data-unified/")
 
 ### `sample_print(df, n=10, seed=None)`
 
-Print `n` contiguous rows from a random offset in a sorted polars df, with `pl.Config(tbl_rows=n)` so polars' default row-clipping doesn't truncate the window. Caller is responsible for sorting first — the slice is contiguous, so it's only meaningful in some intentional order.
+Print `n` contiguous rows from a random offset in a sorted polars, pandas, or pyarrow dataframe. Defeats each engine's default row-clipping so the full window is visible. Caller is responsible for sorting first — the slice is contiguous, so it's only meaningful in some intentional order. pyarrow `Dataset` (lazy) is out of scope; call `.to_table()` first.
 
 ```python
 from arrow_dx import sample_print
 
-sample_print(sorted_df, n=10, seed=42)
+sample_print(polars_df,    n=10, seed=42)
+sample_print(pandas_df,    n=10, seed=42)
+sample_print(pyarrow_table, n=10, seed=42)
 ```
+
+### `summarize(t, *, group_by=None, con=None)`
+
+Per-column summary statistics for a parquet dataset (or any duckdb-readable thing). Returns one row per column: `column_name`, `column_type`, `min`, `max`, `approx_unique`, `avg`, `std`, `q25`, `q50`, `q75`, `count`, `null_percentage`. Quantiles are exact (duckdb spills to disk if needed) and the underlying `SUMMARIZE` runs streaming, so 100M-row datasets don't materialize.
+
+```python
+from arrow_dx import summarize
+
+summarize("data/**/*.parquet")
+summarize("data/**/*.parquet", group_by="region")  # one block per region
+summarize("orders", con=my_con)                    # use a registered table
+```
+
+`t` is a catalog table/view name, parquet file path, or parquet glob. `group_by` runs a separate `SUMMARIZE` per distinct value — fast for low-cardinality columns (regions, years), slow for high-cardinality ones (`user_id`, `sku`). To summarize an in-memory polars DataFrame, register it on a connection first: `con.register("df", my_df); summarize("df", con=con)`.
+
+Requires the `duckdb` extra: `pip install "arrow-dx[duckdb]"`.
+
+## DuckDB
+
+`sample_print` is also shipped as a duckdb SQL macro. To install it for the duckdb CLI:
+
+```bash
+uvx arrow-dx duckdb-macros >> ~/.duckdbrc
+```
+
+Then in any CLI session:
+
+```sql
+SELECT * FROM sample_print('orders', 10);                    -- catalog table
+SELECT * FROM sample_print('s3://bucket/data.parquet', 10);  -- single file
+SELECT * FROM sample_print('data/**/*.parquet', 10, seed := 42);  -- glob, deterministic
+```
+
+The argument is a string — a catalog table/view name, a parquet file path, or a parquet glob (`'dir/**/*.parquet'`). Caller still owns sort order. With `seed := <int>` the offset is deterministic; without it, a fresh random offset each call. The duckdb CLI's row-clip is `.maxrows N` in your `~/.duckdbrc`, separate from the macro.
+
+For Python users with an open connection:
+
+```python
+import duckdb
+from arrow_dx.duckdb import install_macros
+
+con = duckdb.connect()
+install_macros(con)
+con.sql("SELECT * FROM sample_print('mytable', 10, seed := 42)")
+```
+
+## Reports
+
+`arrow_dx.report.markdown(t)` renders a one-page markdown report — header (path, rows, size, partition count), schema (arrow / polars / duckdb types side-by-side + null %), summary (per-column min/max/avg/std/quartiles via duckdb's `SUMMARIZE`, plus an inline sparkline for numeric columns), hive-partition breakdown, and a contiguous-window sample.
+
+```python
+from arrow_dx.report import markdown
+
+# print to stdout
+print(markdown("data/**/*.parquet"))
+
+# write to a file alongside the data
+markdown("data/**/*.parquet", output="data/REPORT.md", sample_n=20, sample_seed=1)
+```
+
+Options:
+
+- `style="markdown"` (default) renders pipe-and-dash tables that markdown viewers turn into styled tables; `style="box"` switches to Unicode box-drawing tables (┌─┬─┐) wrapped in code fences for monospace contexts (terminals, plain-text files). Sparklines and histograms always use Unicode block characters.
+- `per_partition=True` adds a Per-partition summary section faceted by the leftmost hive column (low-cardinality only — runs one `SUMMARIZE` per group).
+- `sparklines=True` (default) adds a `sparkline` column to the Summary table for numeric columns, showing the per-column distribution in 10 buckets via Unicode block chars (▁▂▃▄▅▆▇█).
+- `histograms=True` (opt-in) adds a Histograms section with full bar-chart per numeric column — bin edges, bar, count.
+
+Drop-in for code review, dataset onboarding, or living docs alongside the data. Deterministic sample seed by default so re-running on unchanged data produces a stable diff.
+
+Requires the `duckdb` extra: `pip install "arrow-dx[duckdb]"`.
 
 ## Scope
 

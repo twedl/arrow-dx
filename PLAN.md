@@ -20,9 +20,9 @@ Every helper must fit "ergonomics for Arrow-backed dataframes". If you can't jus
 - **Required:** polars (used internally by most helpers).
 - **Optional extras:**
   - `arrow-dx[pandas]` → pandas
+  - `arrow-dx[pyarrow]` → pyarrow
   - `arrow-dx[duckdb]` → duckdb
   - `arrow-dx[all]` → everything
-- pyarrow comes transitively with polars; don't list it explicitly.
 
 ## Initial helpers to port over
 1. **`unify_schema(root, *, output_dir, type_overrides, on_conflict, column_order)`**

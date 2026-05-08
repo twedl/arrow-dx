@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "arrow-dx"
-version = "0.1.0"
+version = "0.1.1"
 description = "Helpers for the Arrow-backed Python stack: polars, pyarrow, duckdb."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -22,9 +22,13 @@ dependencies = [
 
 [project.optional-dependencies]
 pandas = ["pandas>=2"]
+pyarrow = ["pyarrow>=15"]
 duckdb = ["duckdb>=1"]
-all = ["arrow-dx[pandas,duckdb]"]
-dev = ["pytest>=8"]
+all = ["arrow-dx[pandas,pyarrow,duckdb]"]
+dev = ["pytest>=8", "pandas>=2", "pyarrow>=15", "duckdb>=1"]
+
+[project.scripts]
+arrow-dx = "arrow_dx.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/arrow_dx"]

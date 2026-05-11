@@ -27,19 +27,19 @@ def test_returns_one_row_per_column(con):
     assert sorted(result["column_name"].to_list()) == ["g", "i", "s", "x"]
 
 
-def test_includes_quantiles_and_null_percentage(con):
+def test_includes_quantiles_and_null_perc(con):
     result = summarize("t", con=con)
-    expected = {"min", "max", "avg", "std", "q25", "q50", "q75", "null_percentage"}
+    expected = {"min", "max", "avg", "std", "q25", "q50", "q75", "null_perc"}
     assert expected.issubset(set(result.columns))
 
 
-def test_null_percentage_reflects_nulls(con):
+def test_null_perc_reflects_nulls(con):
     """Column 's' has nulls every 3rd row → ~34/100 nulls."""
     result = summarize("t", con=con)
     s_row = result.filter(pl.col("column_name") == "s")
     i_row = result.filter(pl.col("column_name") == "i")
-    assert float(s_row["null_percentage"][0]) > 0
-    assert float(i_row["null_percentage"][0]) == 0
+    assert float(s_row["null_perc"][0]) > 0
+    assert float(i_row["null_perc"][0]) == 0
 
 
 def test_group_by_facets_per_group(con):
@@ -53,12 +53,29 @@ def test_group_by_facets_per_group(con):
     assert "g" not in result["column_name"].to_list()
 
 
+def test_group_by_orders_column_major(con):
+    """Rows are column-major: each non-group column is a contiguous block,
+    in original schema order; partitions sorted within each block."""
+    result = summarize("t", group_by="g", con=con)
+    rows = list(zip(result["column_name"].to_list(), result["g"].to_list()))
+    # Schema order: i, x, s, g — g is the partition column. Distinct g
+    # values are 'a' and 'b', sorted within each column block.
+    assert rows == [
+        ("i", "a"),
+        ("i", "b"),
+        ("x", "a"),
+        ("x", "b"),
+        ("s", "a"),
+        ("s", "b"),
+    ]
+
+
 def test_group_by_stats_match_subset(con):
     """Per-group min/max/count match a manual filter."""
     result = summarize("t", group_by="g", con=con)
     a_i = result.filter((pl.col("g") == "a") & (pl.col("column_name") == "i"))
-    assert a_i["min"][0] == "0"
-    assert a_i["max"][0] == "49"
+    assert int(a_i["min"][0]) == 0
+    assert int(a_i["max"][0]) == 49
     assert a_i["count"][0] == 50
 
 
@@ -103,6 +120,6 @@ def test_handles_nan_in_float_column(tmp_path):
     result = summarize(str(p))
 
     score = result.filter(pl.col("column_name") == "score")
-    assert float(score["null_percentage"][0]) == 20.0
-    assert score["min"][0] == "1.0"
-    assert score["max"][0] == "5.0"
+    assert float(score["null_perc"][0]) == 20.0
+    assert int(score["min"][0]) == 1
+    assert int(score["max"][0]) == 5

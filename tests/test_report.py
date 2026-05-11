@@ -92,7 +92,7 @@ def test_deterministic_for_fixed_seed(hive_dataset):
 def test_nan_in_float_column_doesnt_break(hive_dataset):
     """The NaN at index 5 of `score` (set up in the fixture) shouldn't break SUMMARIZE."""
     md = markdown(str(hive_dataset / "**" / "*.parquet"))
-    # null_percentage for score should be > 0 due to the NaN coercion
+    # null_perc for score should be > 0 due to the NaN coercion
     summary = md.split("## Summary")[1].split("##")[0]
     score_lines = [line for line in summary.splitlines() if line.startswith("| score")]
     assert score_lines, "score row missing from summary"

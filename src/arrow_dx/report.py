@@ -233,7 +233,7 @@ def _schema_section(
     null_pcts = dict(
         zip(
             summary_df["column_name"].to_list(),
-            (str(p) for p in summary_df["null_percentage"].to_list()),
+            (str(p) for p in summary_df["null_perc"].to_list()),
         )
     )
 

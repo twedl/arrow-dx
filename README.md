@@ -98,7 +98,7 @@ con.sql("SELECT * FROM sample_print('mytable', 10, seed := 42)")
 `arrow_dx.report.markdown(t)` renders a one-page markdown report — header (path, rows, size, partition count), schema (arrow / polars / duckdb types side-by-side + null %), summary (per-column min/max/avg/std/quartiles via duckdb's `SUMMARIZE`, plus an inline sparkline for numeric columns), hive-partition breakdown, and a contiguous-window sample.
 
 ```python
-from arrow_dx.report import markdown
+from arrow_dx import markdown
 
 # print to stdout
 print(markdown("data/**/*.parquet"))

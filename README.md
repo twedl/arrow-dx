@@ -50,7 +50,7 @@ sample_print(pyarrow_table, n=10, seed=42)
 
 ### `summarize(t, *, group_by=None, con=None)`
 
-Per-column summary statistics for a parquet dataset (or any duckdb-readable thing). Returns one row per column: `column_name`, `column_type`, `min`, `max`, `n_unique`, `avg`, `std`, `q25`, `q50`, `q75`, `count`, `null_perc`. Numeric stats are formatted to 4 significant figures and decimal-aligned for compact display. Quantiles are exact (duckdb spills to disk if needed) and the underlying `SUMMARIZE` runs streaming, so 100M-row datasets don't materialize.
+Per-column summary statistics for a parquet dataset (or any duckdb-readable thing). Returns one row per column: `column_name`, `column_type`, `min`, `max`, `n_unique`, `avg`, `std`, `q25`, `q50`, `q75`, `count`, `null_perc`. Numeric stats are formatted to 4 significant figures and decimal-aligned for compact display. `min`/`max` are nulled for VARCHAR columns (lexical bounds rarely meaningful); DATE columns keep `YYYY-MM-DD` format in aggregates. Quantiles are exact (duckdb spills to disk if needed) and the underlying `SUMMARIZE` runs streaming, so 100M-row datasets don't materialize.
 
 ```python
 from arrow_dx import summarize

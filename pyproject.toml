@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "arrow-dx"
-version = "0.1.1"
+version = "0.1.2"
 description = "Helpers for the Arrow-backed Python stack: polars, pyarrow, duckdb."
 readme = "README.md"
 license = { file = "LICENSE" }

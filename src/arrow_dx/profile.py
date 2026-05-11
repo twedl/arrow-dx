@@ -76,7 +76,10 @@ def summarize(
     Returns one row per column with: `column_name`, `column_type`, `min`,
     `max`, `n_unique` (approx-distinct count), `avg`, `std`, `q25`, `q50`,
     `q75`, `count`, `null_perc`. Numeric stats are formatted to 4
-    significant figures for compact display. Quantiles are exact (duckdb
+    significant figures for compact display. `min`/`max` are nulled for
+    VARCHAR columns (lexical ordering rarely matches user intent). DATE
+    columns: stat values keep `YYYY-MM-DD` format (duckdb's `avg` of dates
+    returns a TIMESTAMP string by default). Quantiles are exact (duckdb
     spills to disk if needed). Works on 100M-row datasets without
     materialization.
 
@@ -136,12 +139,37 @@ def summarize(
             .select(group_by, pl.exclude(group_by))
         )
 
+    is_varchar = pl.col("column_type") == "VARCHAR"
+    result = result.with_columns(
+        [
+            pl.when(is_varchar).then(None).otherwise(pl.col(c)).alias(c)
+            for c in ("min", "max")
+        ]
+    )
+
+    # sig-figs first — forces String dtype on _STAT_COLS so the subsequent
+    # str.split for DATE columns doesn't trip over Null-inferred columns.
     result = result.rename(_RENAMES).with_columns(
         [
             pl.col(c).map_elements(_fmt_sigfigs, return_dtype=pl.String)
             for c in _STAT_COLS
         ]
     )
+
+    # DATE aggregates: duckdb returns avg as TIMESTAMP-formatted
+    # ('2020-05-15 00:00:00'); strip the time portion to keep YYYY-MM-DD.
+    # No-op for stats already in date format (min/max/quantiles).
+    is_date = pl.col("column_type") == "DATE"
+    result = result.with_columns(
+        [
+            pl.when(is_date)
+            .then(pl.col(c).str.split(" ").list.first())
+            .otherwise(pl.col(c))
+            .alias(c)
+            for c in _STAT_COLS
+        ]
+    )
+
     return result.with_columns(
         [pl.Series(c, _align_decimals(result[c].to_list())) for c in _STAT_COLS]
     )

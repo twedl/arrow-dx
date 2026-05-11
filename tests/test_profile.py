@@ -79,6 +79,37 @@ def test_group_by_stats_match_subset(con):
     assert a_i["count"][0] == 50
 
 
+def test_varchar_columns_have_null_min_max(con):
+    """For VARCHAR columns, min/max are nulled — lexical bounds (e.g.
+    min='1', max='8' for digit-strings) rarely match user intent."""
+    result = summarize("t", con=con)
+    s_row = result.filter(pl.col("column_name") == "s")
+    assert s_row["min"][0] is None
+    assert s_row["max"][0] is None
+    # numeric columns are unaffected
+    i_row = result.filter(pl.col("column_name") == "i")
+    assert i_row["min"][0] is not None
+    assert i_row["max"][0] is not None
+
+
+def test_date_aggregates_keep_yyyy_mm_dd_format():
+    """DATE columns: duckdb's avg returns a TIMESTAMP string by default
+    ('2020-05-15 00:00:00'); we strip the time portion so all stats render
+    in the same YYYY-MM-DD format as the source column."""
+    con = duckdb.connect()
+    con.execute("""
+        CREATE TABLE t AS
+        SELECT DATE '2020-01-01' + CAST(range AS INTEGER) * 30 AS dt
+        FROM range(10)
+    """)
+    result = summarize("t", con=con)
+    dt = result.filter(pl.col("column_name") == "dt")
+    assert dt["min"][0] == "2020-01-01"
+    assert dt["max"][0] == "2020-09-27"
+    assert dt["avg"][0] == "2020-05-15"  # not "2020-05-15 00:00:00"
+    assert dt["q50"][0] == "2020-05-15"
+
+
 def test_parquet_path(con, tmp_path):
     p = tmp_path / "data.parquet"
     con.execute(f"COPY t TO '{p}'")

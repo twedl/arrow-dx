@@ -116,6 +116,8 @@ Options:
 
 Drop-in for code review, dataset onboarding, or living docs alongside the data. Deterministic sample seed by default so re-running on unchanged data produces a stable diff.
 
+Sparkline rendering note: Unicode block chars (▁▂▃▄▅▆▇█) report a monospace width of 1 cell but can render slightly wider in VS Code / Cursor with the default font (Menlo, Monaco, SF Mono). Over 10 chars the drift accumulates and the sparkline overflows past the right `│` of its cell. This is an upstream Chromium/Electron limitation ([microsoft/vscode#1727](https://github.com/microsoft/vscode/issues/1727), closed won't-fix in 2017), not something the report can fix on its end. Switch your editor font to one with consistent monospace block-char widths — JetBrains Mono, Fira Code, Cascadia Code, IBM Plex Mono all work.
+
 Requires the `duckdb` extra: `pip install "arrow-dx[duckdb]"`.
 
 ## Scope
